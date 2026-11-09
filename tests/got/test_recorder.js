@@ -1,6 +1,7 @@
 import http from 'node:http'
 import https from 'node:https'
 import { URLSearchParams } from 'node:url'
+import { runInNewContext } from 'node:vm'
 import zlib from 'node:zlib'
 import sinon from 'sinon'
 import { expect } from 'chai'
@@ -255,6 +256,50 @@ describe('Recorder', () => {
     expect(response2.body).to.equal(exampleText)
     nocks.forEach(nock => nock.done())
   })
+
+  for (const outputObjects of [true, false]) {
+    it(
+      'records and replays multiple Set-Cookie headers (' + outputObjects + ')',
+      async () => {
+        const cookies = [
+          'session=abc; Path=/; HttpOnly',
+          'csrf=xyz; Expires=Wed, 01 Jan 2031 00:00:00 GMT',
+          ...Array.from({ length: 99 }, (_, i) => `cookie-${i}=value`),
+        ]
+        const { origin } = await servers.startHttpServer(
+          (request, response) => {
+            response.setHeader('Set-Cookie', cookies)
+            response.end('ok')
+          },
+        )
+
+        nock.restore()
+        nock.recorder.clear()
+        nock.recorder.rec({ dont_print: true, output_objects: outputObjects })
+
+        const live = await fetch(origin)
+        expect(await live.text()).to.equal('ok')
+        expect(live.headers.getSetCookie()).to.deep.equal(cookies)
+
+        const recorded = nock.recorder.play()
+        nock.restore()
+        nock.recorder.clear()
+        nock.activate()
+        nock.disableNetConnect()
+
+        expect(recorded).to.have.lengthOf(1)
+        if (outputObjects) {
+          nock.define(recorded)
+        } else {
+          runInNewContext(recorded[0], { nock })
+        }
+
+        const replayed = await fetch(origin)
+        expect(await replayed.text()).to.equal('ok')
+        expect(replayed.headers.getSetCookie()).to.deep.equal(cookies)
+      },
+    )
+  }
 
   it('records and replays correctly with filteringRequestBody', async () => {
     const responseBody = '<html><body>example</body></html>'

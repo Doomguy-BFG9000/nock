@@ -1249,7 +1249,7 @@ The returned call objects have the following properties:
 - `body` - the body of the call, if any
 - `status` - the HTTP status of the reply (e.g. `200`)
 - `response` - the body of the reply which can be a JSON, string, hex string representing binary buffers or an array of such hex strings (when handling `content-encoded` in reply header)
-- `rawHeaders` - the headers of the reply which are formatted as a flat array containing header name and header value pairs (e.g. `['accept', 'application/json', 'set-cookie', 'my-cookie=value']`)
+- `rawHeaders` - the reply headers keyed by name. When the response includes multiple `Set-Cookie` headers, `rawHeaders['set-cookie']` contains their values in order.
 - `reqheader` - the headers of the request
 
 If you save this as a JSON file, you can load them directly through `nock.load(path)`. Then you can post-process them before using them in the tests. For example, to add request body filtering (shown here fixing timestamps to match the ones captured during recording):

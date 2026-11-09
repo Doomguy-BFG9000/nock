@@ -238,7 +238,17 @@ async function playbackInterceptor({
       }
     }
 
-    return new Headers(rawHeaders)
+    return new Headers(
+      rawHeaders.flatMap(([name, value]) => {
+        if (
+          Array.isArray(value) &&
+          String(name).toLowerCase() === 'set-cookie'
+        ) {
+          return value.map(cookie => [name, cookie])
+        }
+        return [[name, value]]
+      }),
+    )
   }
 
   async function continueWithResponseBody(
